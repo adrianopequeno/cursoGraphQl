@@ -124,3 +124,81 @@ export const resolvers = [
 ```
 
 ![alt text](image-5.png)
+
+## Union Types
+
+typedefes:
+
+```
+import { gql } from 'apollo-server';
+
+export const postTypeDefs = gql`
+  extend type Query {
+    post(id: ID!): PostResult
+    posts(input: ApiFiltersInput): [Post!]!
+  }
+
+  union PostResult = PostNotFoundError | Post
+
+  type PostNotFoundError {
+    statusCode: Int!
+    message: String!
+  }
+
+  type Post {
+    id: ID!
+    title: String!
+    body: String!
+    # userId: String!
+    indexRef: Int!
+    createdAt: String!
+    # user: User!
+    unixTimestamp: String!
+  }
+`;
+```
+
+resolvers:
+
+```
+const posts = async (_, { input }, { getPosts }) => {
+  const apiFiltersInput = new URLSearchParams(input).toString();
+  const posts = await getPosts(apiFiltersInput);
+  return posts.json();
+};
+
+const post = async (_, { id }, { getPosts }) => {
+  const response = await getPosts(id);
+  const post = await response.json();
+  if (!post.id) {
+    return {
+      statusCode: 404,
+      message: 'Post not found',
+    };
+  }
+  return post;
+};
+
+export const postResolvers = {
+  Query: {
+    posts,
+    post,
+  },
+  Post: {
+    unixTimestamp: (parent) => {
+      return Math.floor(new Date(parent.createdAt).getTime() / 1000);
+    },
+  },
+  PostResult: {
+    __resolveType: (obj) => {
+      if (obj.id) return 'Post';
+      if (obj.statusCode) return 'PostNotFoundError';
+      return null;
+    },
+  },
+};
+```
+
+![alt text](image-6.png)
+![alt text](image-7.png)
+![alt text](image-8.png)
